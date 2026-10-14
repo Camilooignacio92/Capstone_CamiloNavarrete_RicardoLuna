@@ -157,22 +157,26 @@ export default function HomeScreen({ navigation }) {
 
       {/* 5. Barra de Navegación Inferior (Bottom Navigation) */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Home')}>
           <Ionicons name="home" size={22} color="#1E40AF" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+
+        <TouchableOpacity style={styles.navItem} onPress={() => alert('Próximamente')}>
           <Ionicons name="compass-outline" size={22} color="#64748B" />
         </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.navItemAdd}
           onPress={() => navigation.navigate('AddVehicle')}
         >
           <Ionicons name="add" size={26} color="#FFFFFF" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+
+        <TouchableOpacity style={styles.navItem} onPress={() => alert('Próximamente')}>
           <Ionicons name="notifications-outline" size={22} color="#64748B" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Profile')}>
           <Ionicons name="person-outline" size={22} color="#64748B" />
         </TouchableOpacity>
       </View>

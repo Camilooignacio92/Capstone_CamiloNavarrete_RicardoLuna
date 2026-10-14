@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { supabase } from '../config/supabase';
+import supabase from '../config/supabase';
 
 export default function AddVehicleScreen({ navigation }) {
   const [patente, setPatente] = useState('');
