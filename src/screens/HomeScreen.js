@@ -1,185 +1,317 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  StyleSheet,
-  Text,
   View,
-  TextInput,
+  Text,
   TouchableOpacity,
-  FlatList,
   ScrollView,
+  StyleSheet,
   SafeAreaView,
-  StatusBar,
-  ActivityIndicator,
+  Alert,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../config/supabase';
 
-export default function HomeScreen({ navigation }) {
-  const [vehicles, setVehicles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState('Todos');
+// 1. LISTA DE CATEGORÍAS
+const CATEGORIES = [
+  { id: '1', name: 'Tolva', icon: 'bus-outline' },
+  { id: '2', name: 'Cama Baja', icon: 'car-outline' },
+  { id: '3', name: 'Aljibe', icon: 'water-outline' },
+  { id: '4', name: 'Pluma', icon: 'build-outline' },
+  { id: '5', name: 'Excavadora', icon: 'hardware-chip-outline' },
+];
 
-  // Categorías de maquinaria con iconos estilo marketplace
-  const categories = [
-    { id: '1', name: 'Tolva', icon: 'bus-outline' },
-    { id: '2', name: 'Cama Baja', icon: 'car-sport-outline' },
-    { id: '3', name: 'Aljibe', icon: 'water-outline' },
-    { id: '4', name: 'Pluma', icon: 'construct-outline' },
-    { id: '5', name: 'Excavadora', icon: 'hardware-chip-outline' },
-  ];
+// 2. LISTA INICIAL DE MAQUINARIA
+const INITIAL_MACHINES = [
+  {
+    id: '1',
+    name: 'CAMIÓN TOLVA 15M3',
+    category: 'Tolva',
+    status: 'Disponible',
+    capacity: '15 T',
+    plate: 'AA-10-20',
+  },
+  {
+    id: '2',
+    name: 'CAMIÓN RAMPLA CAMA BAJA',
+    category: 'Cama Baja',
+    status: 'En Servicio',
+    capacity: '30 T',
+    plate: 'BB-30-40',
+  },
+  {
+    id: '3',
+    name: 'CAMIÓN ALJIBE 10.000L',
+    category: 'Aljibe',
+    status: 'Disponible',
+    capacity: '10 T',
+    plate: 'CC-50-60',
+  },
+  {
+    id: '4',
+    name: 'CAMIÓN PLUMA 8T',
+    category: 'Pluma',
+    status: 'Disponible',
+    capacity: '8 T',
+    plate: 'DD-70-80',
+  },
+  {
+    id: '5',
+    name: 'EXCAVADORA CAT 320',
+    category: 'Excavadora',
+    status: 'En Servicio',
+    capacity: '22 T',
+    plate: 'EE-90-00',
+  },
+];
 
-  useEffect(() => {
-    fetchVehicles();
-  }, []);
+export default function HomeScreen() {
+  // ESTADOS PRINCIPALES
+  const [userRole, setUserRole] = useState('client'); // 'client' o 'admin'
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [machines, setMachines] = useState(INITIAL_MACHINES);
 
-  const fetchVehicles = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.from('transportes').select('*');
-      if (error) throw error;
-      setVehicles(data || []);
-    } catch (err) {
-      console.error('Error al cargar transportes:', err.message);
-    } finally {
-      setLoading(false);
+  // MANEJADOR DE SELECCIÓN DE CATEGORÍAS
+  const handleCategoryPress = (categoryName) => {
+    if (selectedCategory === categoryName) {
+      setSelectedCategory(null); // Si presiona la misma, limpia el filtro
+    } else {
+      setSelectedCategory(categoryName); // Filtra por la categoría seleccionada
     }
   };
 
-  const renderVehicleCard = ({ item }) => (
-    <TouchableOpacity style={styles.productCard} activeOpacity={0.8}>
-      <View style={styles.imagePlaceholder}>
-        <Ionicons name="construct-outline" size={36} color="#94A3B8" />
-        <View
-          style={[
-            styles.badge,
-            { backgroundColor: item.estado === 'Disponible' ? '#E6F4EA' : '#FEF3C7' },
-          ]}
-        >
-          <Text
-            style={[
-              styles.badgeText,
-              { color: item.estado === 'Disponible' ? '#137333' : '#B45309' },
-            ]}
-          >
-            {item.estado}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.cardContent}>
-        <Text style={styles.brandText}>{item.tipo || 'Maquinaria'}</Text>
-        <Text style={styles.titleText}>{item.patente}</Text>
-        <Text style={styles.capacityText}>Capacidad: {item.capacidad_ton} T</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  // FILTRADO COMBINADO (Por categoría seleccionada y por buscador)
+  const filteredMachines = machines.filter((machine) => {
+    const matchesCategory = selectedCategory
+      ? machine.category === selectedCategory
+      : true;
+    const matchesSearch =
+      machine.plate.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      machine.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      machine.category.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesCategory && matchesSearch;
+  });
+
+  // ACCIONES EXCLUSIVAS DE ADMINISTRADOR
+  const handleChangeStatus = (machineId, currentStatus) => {
+    const newStatus =
+      currentStatus === 'Disponible' ? 'En Servicio' : 'Disponible';
+    setMachines(
+      machines.map((m) =>
+        m.id === machineId ? { ...m, status: newStatus } : m
+      )
+    );
+    Alert.alert('Estado Actualizado', `La maquinaria ahora está: ${newStatus}`);
+  };
+
+  const handleAddMachine = () => {
+    Alert.alert(
+      'Añadir Maquinaria',
+      'Aquí se abrirá el formulario para registrar un nuevo equipo en Supabase.'
+    );
+  };
+
+  // ACCIONES EXCLUSIVAS DE CLIENTE
+  const handleRequestMachine = (machine) => {
+    Alert.alert(
+      'Solicitud Enviada',
+      `Has solicitado el arriendo de la maquinaria con patente: ${machine.plate}`
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-
-      {/* 1. Chips de Acceso Rápido (Favoritos, Historial, etc.) */}
-      <View style={styles.topChipsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-          <TouchableOpacity style={styles.chipButton}>
-            <Ionicons name="heart-outline" size={16} color="#334155" />
-            <Text style={styles.chipText}>Favoritos</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.chipButton}>
-            <Ionicons name="time-outline" size={16} color="#334155" />
-            <Text style={styles.chipText}>Historial</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.chipButton}>
-            <Ionicons name="person-add-outline" size={16} color="#334155" />
-            <Text style={styles.chipText}>Seguidos</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.chipButton}>
-            <Ionicons name="document-text-outline" size={16} color="#334155" />
-            <Text style={styles.chipText}>Cotizaciones</Text>
-          </TouchableOpacity>
-        </ScrollView>
+      {/* BARRA SUPERIOR PARA CAMBIAR ROL (DEMO PARA EL PROFESOR) */}
+      <View style={styles.roleBar}>
+        <Text style={styles.roleText}>
+          Rol Activo:{' '}
+          <Text style={styles.roleHighlight}>{userRole.toUpperCase()}</Text>
+        </Text>
+        <TouchableOpacity
+          style={styles.switchButton}
+          onPress={() =>
+            setUserRole(userRole === 'client' ? 'admin' : 'client')
+          }
+        >
+          <Text style={styles.switchButtonText}>
+            Cambiar a {userRole === 'client' ? 'Admin' : 'Cliente'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* 2. Buscador de Ubicación tipo Uber */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#64748B" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="¿A dónde envías o necesitas maquinaria?"
-          placeholderTextColor="#94A3B8"
-        />
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* BARRA DE BÚSQUEDA */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search-outline" size={20} color="#94a3b8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="¿A dónde envías o necesitas maquinaria?"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery !== '' && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color="#94a3b8" />
+            </TouchableOpacity>
+          )}
+        </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* 3. Categorías Circulares (Carrusel Horizontal) */}
+        {/* SECCIÓN DE CATEGORÍAS */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Categorías</Text>
-          <Ionicons name="chevron-forward" size={18} color="#0F172A" />
+          {selectedCategory && (
+            <TouchableOpacity onPress={() => setSelectedCategory(null)}>
+              <Text style={styles.clearFilterText}>Ver todas</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              style={styles.categoryItem}
-              onPress={() => setSelectedCategory(cat.name)}
-            >
-              <View style={[styles.circleAvatar, selectedCategory === cat.name && styles.circleAvatarActive]}>
-                <Ionicons
-                  name={cat.icon}
-                  size={26}
-                  color={selectedCategory === cat.name ? '#1E40AF' : '#475569'}
-                />
-              </View>
-              <Text style={styles.categoryLabel}>{cat.name}</Text>
-            </TouchableOpacity>
-          ))}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoriesContainer}
+        >
+          {CATEGORIES.map((cat) => {
+            const isSelected = selectedCategory === cat.name;
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                onPress={() => handleCategoryPress(cat.name)}
+                style={[
+                  styles.categoryCard,
+                  isSelected && styles.categoryCardSelected,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.iconCircle,
+                    isSelected && styles.iconCircleSelected,
+                  ]}
+                >
+                  <Ionicons
+                    name={cat.icon}
+                    size={24}
+                    color={isSelected ? '#fff' : '#2563eb'}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.categoryName,
+                    isSelected && styles.categoryNameSelected,
+                  ]}
+                >
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
-        {/* 4. Listado Principal de Maquinarias */}
+        {/* SECCIÓN DE MAQUINARIA Y ACCIÓN ADMIN */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Maquinaria Disponible</Text>
-          <Ionicons name="chevron-forward" size={18} color="#0F172A" />
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.sectionTitle}>
+              {selectedCategory
+                ? `Maquinaria: ${selectedCategory}`
+                : 'Maquinaria Disponible'}
+            </Text>
+            <Text style={styles.itemCount}> ({filteredMachines.length})</Text>
+          </View>
+
+          {/* BOTÓN EXCLUSIVO DE ADMINISTRADOR */}
+          {userRole === 'admin' && (
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={handleAddMachine}
+            >
+              <Ionicons name="add" size={18} color="#fff" />
+              <Text style={styles.addBtnText}>Nueva</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {loading ? (
-          <ActivityIndicator size="large" color="#1E40AF" style={{ marginTop: 20 }} />
-        ) : (
-          <FlatList
-            data={vehicles}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderVehicleCard}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.productsGrid}
-          />
-        )}
+        {/* LISTA DE TARJETAS DE MAQUINARIA */}
+        <View style={styles.machinesGrid}>
+          {filteredMachines.length > 0 ? (
+            filteredMachines.map((machine) => (
+              <View key={machine.id} style={styles.machineCard}>
+                <View style={styles.badgeContainer}>
+                  <Text
+                    style={[
+                      styles.statusBadge,
+                      {
+                        backgroundColor:
+                          machine.status === 'Disponible'
+                            ? '#dcfce7'
+                            : '#fef3c7',
+                        color:
+                          machine.status === 'Disponible'
+                            ? '#15803d'
+                            : '#b45309',
+                      },
+                    ]}
+                  >
+                    {machine.status}
+                  </Text>
+                </View>
+
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="build-outline" size={36} color="#2563eb" />
+                </View>
+
+                <Text style={styles.categorySubText}>
+                  {machine.category.toUpperCase()}
+                </Text>
+                <Text style={styles.machinePlate}>{machine.plate}</Text>
+                <Text style={styles.machineDetail}>
+                  Capacidad: {machine.capacity}
+                </Text>
+
+                {/* BOTONES SEGÚN EL ROL DEL USUARIO */}
+                {userRole === 'client' ? (
+                  /* VISTA CLIENTE */
+                  <TouchableOpacity
+                    style={[
+                      styles.actionBtn,
+                      {
+                        backgroundColor:
+                          machine.status === 'Disponible'
+                            ? '#2563eb'
+                            : '#94a3b8',
+                      },
+                    ]}
+                    disabled={machine.status !== 'Disponible'}
+                    onPress={() => handleRequestMachine(machine)}
+                  >
+                    <Text style={styles.actionBtnText}>
+                      {machine.status === 'Disponible'
+                        ? 'Solicitar / Rentar'
+                        : 'En Servicio'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  /* VISTA ADMINISTRADOR */
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: '#334155' }]}
+                    onPress={() =>
+                      handleChangeStatus(machine.id, machine.status)
+                    }
+                  >
+                    <Text style={styles.actionBtnText}>Cambiar Estado</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                No se encontraron maquinarias en esta sección.
+              </Text>
+            </View>
+          )}
+        </View>
       </ScrollView>
-
-      {/* 5. Barra de Navegación Inferior (Bottom Navigation) */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Home')}>
-          <Ionicons name="home" size={22} color="#1E40AF" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => alert('Próximamente')}>
-          <Ionicons name="compass-outline" size={22} color="#64748B" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItemAdd}
-          onPress={() => navigation.navigate('AddVehicle')}
-        >
-          <Ionicons name="add" size={26} color="#FFFFFF" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => alert('Próximamente')}>
-          <Ionicons name="notifications-outline" size={22} color="#64748B" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Profile')}>
-          <Ionicons name="person-outline" size={22} color="#64748B" />
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
@@ -187,57 +319,62 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingTop: StatusBar.currentHeight || 20,
+    backgroundColor: '#ffffff',
   },
-  topChipsContainer: {
-    paddingVertical: 10,
-  },
-  chipsScroll: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  chipButton: {
+  roleBar: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 20,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: '#f1f5f9',
+    borderBottomWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  chipText: {
-    fontSize: 13,
+  roleText: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  roleHighlight: {
+    fontWeight: 'bold',
+    color: '#2563eb',
+  },
+  switchButton: {
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  switchButtonText: {
+    color: '#fff',
+    fontSize: 11,
     fontWeight: '600',
-    color: '#334155',
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    backgroundColor: '#f8fafc',
     marginHorizontal: 16,
-    marginVertical: 6,
+    marginTop: 12,
+    marginBottom: 5,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  searchIcon: {
-    marginRight: 8,
+    borderColor: '#e2e8f0',
   },
   searchInput: {
     flex: 1,
+    marginLeft: 8,
     fontSize: 14,
-    color: '#0F172A',
-  },
-  scrollContent: {
-    paddingBottom: 80,
+    color: '#0f172a',
   },
   sectionHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     marginTop: 18,
@@ -245,118 +382,135 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginRight: 4,
+    fontWeight: 'bold',
+    color: '#0f172a',
   },
-  categoriesScroll: {
-    paddingHorizontal: 16,
-    gap: 16,
+  clearFilterText: {
+    color: '#2563eb',
+    fontWeight: '600',
+    fontSize: 13,
   },
-  categoryItem: {
+  itemCount: {
+    color: '#64748b',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  addBtn: {
+    flexDirection: 'row',
+    backgroundColor: '#16a34a',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
     alignItems: 'center',
-    width: 72,
   },
-  circleAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F1F5F9',
+  addBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+    marginLeft: 2,
+  },
+  categoriesContainer: {
+    paddingLeft: 16,
+  },
+  categoryCard: {
+    alignItems: 'center',
+    marginRight: 14,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    minWidth: 75,
+  },
+  categoryCardSelected: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+    borderWidth: 1,
+  },
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 6,
   },
-  circleAvatarActive: {
-    backgroundColor: '#DBEAFE',
-    borderWidth: 2,
-    borderColor: '#1E40AF',
+  iconCircleSelected: {
+    backgroundColor: '#2563eb',
   },
-  categoryLabel: {
+  categoryName: {
     fontSize: 12,
     color: '#475569',
-    textAlign: 'center',
     fontWeight: '500',
   },
-  productsGrid: {
-    paddingHorizontal: 16,
-    gap: 12,
+  categoryNameSelected: {
+    color: '#2563eb',
+    fontWeight: 'bold',
   },
-  productCard: {
-    width: 160,
-    backgroundColor: '#FFFFFF',
+  machinesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+  },
+  machineCard: {
+    width: '48%',
+    backgroundColor: '#f8fafc',
     borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#e2e8f0',
+  },
+  badgeContainer: {
+    alignItems: 'flex-start',
+  },
+  statusBadge: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     overflow: 'hidden',
   },
   imagePlaceholder: {
-    height: 110,
-    backgroundColor: '#F8FAFC',
+    height: 70,
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
+    marginVertical: 6,
   },
-  badge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  badgeText: {
+  categorySubText: {
     fontSize: 10,
-    fontWeight: '700',
-  },
-  cardContent: {
-    padding: 10,
-  },
-  brandText: {
-    fontSize: 11,
-    color: '#64748B',
-    textTransform: 'uppercase',
+    color: '#64748b',
     fontWeight: '600',
   },
-  titleText: {
+  machinePlate: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 2,
+    fontWeight: 'bold',
+    color: '#0f172a',
   },
-  capacityText: {
+  machineDetail: {
     fontSize: 12,
-    color: '#475569',
-    marginTop: 4,
+    color: '#64748b',
+    marginTop: 2,
+    marginBottom: 8,
   },
-  bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  actionBtn: {
+    paddingVertical: 8,
+    borderRadius: 6,
     alignItems: 'center',
-    paddingHorizontal: 10,
   },
-  navItem: {
-    padding: 8,
+  actionBtnText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
-  navItemAdd: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1E40AF',
-    justifyContent: 'center',
+  emptyContainer: {
+    width: '100%',
+    padding: 20,
     alignItems: 'center',
-    bottom: 10,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+  },
+  emptyText: {
+    color: '#94a3b8',
+    fontStyle: 'italic',
   },
 });
