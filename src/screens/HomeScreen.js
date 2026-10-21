@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,12 @@ import {
   SafeAreaView,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../config/supabase';
 
-// 1. LISTA DE CATEGORÍAS
+// 1. CATEGORÍAS DE MAQUINARIA
 const CATEGORIES = [
   { id: '1', name: 'Tolva', icon: 'bus-outline' },
   { id: '2', name: 'Cama Baja', icon: 'car-outline' },
@@ -20,67 +22,105 @@ const CATEGORIES = [
   { id: '5', name: 'Excavadora', icon: 'hardware-chip-outline' },
 ];
 
-// 2. LISTA INICIAL DE MAQUINARIA
-const INITIAL_MACHINES = [
-  {
-    id: '1',
-    name: 'CAMIÓN TOLVA 15M3',
-    category: 'Tolva',
-    status: 'Disponible',
-    capacity: '15 T',
-    plate: 'AA-10-20',
-  },
-  {
-    id: '2',
-    name: 'CAMIÓN RAMPLA CAMA BAJA',
-    category: 'Cama Baja',
-    status: 'En Servicio',
-    capacity: '30 T',
-    plate: 'BB-30-40',
-  },
-  {
-    id: '3',
-    name: 'CAMIÓN ALJIBE 10.000L',
-    category: 'Aljibe',
-    status: 'Disponible',
-    capacity: '10 T',
-    plate: 'CC-50-60',
-  },
-  {
-    id: '4',
-    name: 'CAMIÓN PLUMA 8T',
-    category: 'Pluma',
-    status: 'Disponible',
-    capacity: '8 T',
-    plate: 'DD-70-80',
-  },
-  {
-    id: '5',
-    name: 'EXCAVADORA CAT 320',
-    category: 'Excavadora',
-    status: 'En Servicio',
-    capacity: '22 T',
-    plate: 'EE-90-00',
-  },
-];
-
 export default function HomeScreen() {
-  // ESTADOS PRINCIPALES
+  // ESTADOS DE LA APLICACIÓN
   const [userRole, setUserRole] = useState('client'); // 'client' o 'admin'
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [machines, setMachines] = useState(INITIAL_MACHINES);
+  const [machines, setMachines] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // MANEJADOR DE SELECCIÓN DE CATEGORÍAS
-  const handleCategoryPress = (categoryName) => {
-    if (selectedCategory === categoryName) {
-      setSelectedCategory(null); // Si presiona la misma, limpia el filtro
-    } else {
-      setSelectedCategory(categoryName); // Filtra por la categoría seleccionada
+  // 2. EFECTO INICIAL: CARGA DE DATOS Y ROL DE USUARIO
+  useEffect(() => {
+    fetchMachines();
+    fetchUserProfile();
+  }, []);
+
+  // Consultar lista de maquinarias desde Supabase
+  const fetchMachines = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('machines')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        Alert.alert('Error al cargar datos', error.message);
+      } else {
+        setMachines(data || []);
+      }
+    } catch (err) {
+      console.error('Error de conexión con máquinas:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // FILTRADO COMBINADO (Por categoría seleccionada y por buscador)
+  // Consultar perfil del usuario autenticado para asignar su Rol
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (data && data.role) {
+          setUserRole(data.role);
+        }
+      }
+    } catch (err) {
+      console.log('Sesión no encontrada o error al consultar perfil:', err);
+    }
+  };
+
+  // 3. ACCIONES DE ADMINISTRADOR
+  const handleChangeStatus = async (machineId, currentStatus) => {
+    const newStatus = currentStatus === 'Disponible' ? 'En Servicio' : 'Disponible';
+
+    const { error } = await supabase
+      .from('machines')
+      .update({ status: newStatus })
+      .eq('id', machineId);
+
+    if (error) {
+      Alert.alert('Error de actualización', error.message);
+    } else {
+      setMachines(
+        machines.map((m) => (m.id === machineId ? { ...m, status: newStatus } : m))
+      );
+      Alert.alert('Estado Actualizado', `La maquinaria ahora está: ${newStatus}`);
+    }
+  };
+
+  const handleAddMachine = () => {
+    Alert.alert(
+      'Agregar Maquinaria',
+      'Aquí se desplegará el formulario para ingresar un nuevo equipo.'
+    );
+  };
+
+  // 4. ACCIONES DE CLIENTE
+  const handleRequestMachine = (machine) => {
+    Alert.alert(
+      'Solicitud de Arriendo',
+      `Has solicitado la maquinaria con patente: ${machine.plate}`
+    );
+  };
+
+  // 5. FILTRADO DINÁMICO (Categoría + Buscador)
+  const handleCategoryPress = (categoryName) => {
+    if (selectedCategory === categoryName) {
+      setSelectedCategory(null);
+    } else {
+      setSelectedCategory(categoryName);
+    }
+  };
+
   const filteredMachines = machines.filter((machine) => {
     const matchesCategory = selectedCategory
       ? machine.category === selectedCategory
@@ -93,60 +133,16 @@ export default function HomeScreen() {
     return matchesCategory && matchesSearch;
   });
 
-  // ACCIONES EXCLUSIVAS DE ADMINISTRADOR
-  const handleChangeStatus = (machineId, currentStatus) => {
-    const newStatus =
-      currentStatus === 'Disponible' ? 'En Servicio' : 'Disponible';
-    setMachines(
-      machines.map((m) =>
-        m.id === machineId ? { ...m, status: newStatus } : m
-      )
-    );
-    Alert.alert('Estado Actualizado', `La maquinaria ahora está: ${newStatus}`);
-  };
-
-  const handleAddMachine = () => {
-    Alert.alert(
-      'Añadir Maquinaria',
-      'Aquí se abrirá el formulario para registrar un nuevo equipo en Supabase.'
-    );
-  };
-
-  // ACCIONES EXCLUSIVAS DE CLIENTE
-  const handleRequestMachine = (machine) => {
-    Alert.alert(
-      'Solicitud Enviada',
-      `Has solicitado el arriendo de la maquinaria con patente: ${machine.plate}`
-    );
-  };
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* BARRA SUPERIOR PARA CAMBIAR ROL (DEMO PARA EL PROFESOR) */}
-      <View style={styles.roleBar}>
-        <Text style={styles.roleText}>
-          Rol Activo:{' '}
-          <Text style={styles.roleHighlight}>{userRole.toUpperCase()}</Text>
-        </Text>
-        <TouchableOpacity
-          style={styles.switchButton}
-          onPress={() =>
-            setUserRole(userRole === 'client' ? 'admin' : 'client')
-          }
-        >
-          <Text style={styles.switchButtonText}>
-            Cambiar a {userRole === 'client' ? 'Admin' : 'Cliente'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        
         {/* BARRA DE BÚSQUEDA */}
         <View style={styles.searchContainer}>
           <Ionicons name="search-outline" size={20} color="#94a3b8" />
           <TextInput
             style={styles.searchInput}
-            placeholder="¿A dónde envías o necesitas maquinaria?"
+            placeholder="¿Qué maquinaria estás buscando?"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -208,7 +204,7 @@ export default function HomeScreen() {
           })}
         </ScrollView>
 
-        {/* SECCIÓN DE MAQUINARIA Y ACCIÓN ADMIN */}
+        {/* ENCABEZADO DE SECCIÓN DE MAQUINARIA + BOTÓN ADMIN */}
         <View style={styles.sectionHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={styles.sectionTitle}>
@@ -219,98 +215,100 @@ export default function HomeScreen() {
             <Text style={styles.itemCount}> ({filteredMachines.length})</Text>
           </View>
 
-          {/* BOTÓN EXCLUSIVO DE ADMINISTRADOR */}
+          {/* BOTÓN VISIBLE SÓLO PARA ADMINISTRADORES */}
           {userRole === 'admin' && (
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={handleAddMachine}
-            >
+            <TouchableOpacity style={styles.addBtn} onPress={handleAddMachine}>
               <Ionicons name="add" size={18} color="#fff" />
               <Text style={styles.addBtnText}>Nueva</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* LISTA DE TARJETAS DE MAQUINARIA */}
-        <View style={styles.machinesGrid}>
-          {filteredMachines.length > 0 ? (
-            filteredMachines.map((machine) => (
-              <View key={machine.id} style={styles.machineCard}>
-                <View style={styles.badgeContainer}>
-                  <Text
-                    style={[
-                      styles.statusBadge,
-                      {
-                        backgroundColor:
-                          machine.status === 'Disponible'
-                            ? '#dcfce7'
-                            : '#fef3c7',
-                        color:
-                          machine.status === 'Disponible'
-                            ? '#15803d'
-                            : '#b45309',
-                      },
-                    ]}
-                  >
-                    {machine.status}
-                  </Text>
-                </View>
-
-                <View style={styles.imagePlaceholder}>
-                  <Ionicons name="build-outline" size={36} color="#2563eb" />
-                </View>
-
-                <Text style={styles.categorySubText}>
-                  {machine.category.toUpperCase()}
-                </Text>
-                <Text style={styles.machinePlate}>{machine.plate}</Text>
-                <Text style={styles.machineDetail}>
-                  Capacidad: {machine.capacity}
-                </Text>
-
-                {/* BOTONES SEGÚN EL ROL DEL USUARIO */}
-                {userRole === 'client' ? (
-                  /* VISTA CLIENTE */
-                  <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      {
-                        backgroundColor:
-                          machine.status === 'Disponible'
-                            ? '#2563eb'
-                            : '#94a3b8',
-                      },
-                    ]}
-                    disabled={machine.status !== 'Disponible'}
-                    onPress={() => handleRequestMachine(machine)}
-                  >
-                    <Text style={styles.actionBtnText}>
-                      {machine.status === 'Disponible'
-                        ? 'Solicitar / Rentar'
-                        : 'En Servicio'}
+        {/* VISTA DE CARGA O REJILLA DE MAQUINARIAS */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2563eb" />
+            <Text style={styles.loadingText}>Cargando catálogo...</Text>
+          </View>
+        ) : (
+          <View style={styles.machinesGrid}>
+            {filteredMachines.length > 0 ? (
+              filteredMachines.map((machine) => (
+                <View key={machine.id} style={styles.machineCard}>
+                  <View style={styles.badgeContainer}>
+                    <Text
+                      style={[
+                        styles.statusBadge,
+                        {
+                          backgroundColor:
+                            machine.status === 'Disponible'
+                              ? '#dcfce7'
+                              : '#fef3c7',
+                          color:
+                            machine.status === 'Disponible'
+                              ? '#15803d'
+                              : '#b45309',
+                        },
+                      ]}
+                    >
+                      {machine.status}
                     </Text>
-                  </TouchableOpacity>
-                ) : (
-                  /* VISTA ADMINISTRADOR */
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: '#334155' }]}
-                    onPress={() =>
-                      handleChangeStatus(machine.id, machine.status)
-                    }
-                  >
-                    <Text style={styles.actionBtnText}>Cambiar Estado</Text>
-                  </TouchableOpacity>
-                )}
+                  </View>
+
+                  <View style={styles.imagePlaceholder}>
+                    <Ionicons name="build-outline" size={36} color="#2563eb" />
+                  </View>
+
+                  <Text style={styles.categorySubText}>
+                    {machine.category?.toUpperCase()}
+                  </Text>
+                  <Text style={styles.machinePlate}>{machine.plate}</Text>
+                  <Text style={styles.machineDetail}>
+                    Capacidad: {machine.capacity}
+                  </Text>
+
+                  {/* VISTAS Y BOTONES ADAPTATIVOS SEGÚN EL ROL */}
+                  {userRole === 'client' ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionBtn,
+                        {
+                          backgroundColor:
+                            machine.status === 'Disponible'
+                              ? '#2563eb'
+                              : '#94a3b8',
+                        },
+                      ]}
+                      disabled={machine.status !== 'Disponible'}
+                      onPress={() => handleRequestMachine(machine)}
+                    >
+                      <Text style={styles.actionBtnText}>
+                        {machine.status === 'Disponible'
+                          ? 'Solicitar / Rentar'
+                          : 'En Servicio'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: '#334155' }]}
+                      onPress={() =>
+                        handleChangeStatus(machine.id, machine.status)
+                      }
+                    >
+                      <Text style={styles.actionBtnText}>Cambiar Estado</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  No se encontraron equipos registrados en esta vista.
+                </Text>
               </View>
-            ))
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                No se encontraron maquinarias en esta sección.
-              </Text>
-            </View>
-          )}
-        </View>
+            )}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -320,35 +318,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
-  },
-  roleBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#f1f5f9',
-    borderBottomWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  roleText: {
-    fontSize: 12,
-    color: '#475569',
-  },
-  roleHighlight: {
-    fontWeight: 'bold',
-    color: '#2563eb',
-  },
-  switchButton: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  switchButtonText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
   },
   scrollContent: {
     paddingBottom: 20,
@@ -445,6 +414,15 @@ const styles = StyleSheet.create({
   categoryNameSelected: {
     color: '#2563eb',
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#64748b',
+    fontSize: 13,
   },
   machinesGrid: {
     flexDirection: 'row',
