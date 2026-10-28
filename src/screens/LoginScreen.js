@@ -7,229 +7,181 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
+import { supabase } from '../config/supabase';
 
 export default function LoginScreen({ navigation }) {
-  const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-
-  // Estados para alternar la visibilidad de la contraseña
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const { signIn, signUp, loading } = useAuth();
-
-  const handleSubmit = async () => {
-    // 1. Validar campos obligatorios
+  const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Atención', 'Por favor ingresa tu correo y contraseña.');
+      Alert.alert('Campos requeridos', 'Por favor ingresa correo y contraseña.');
       return;
     }
 
-    if (isRegistering) {
-      if (!fullName.trim()) {
-        Alert.alert('Atención', 'Por favor ingresa tu nombre completo.');
-        return;
-      }
-
-      if (!confirmPassword.trim()) {
-        Alert.alert('Atención', 'Por favor confirma tu contraseña.');
-        return;
-      }
-
-      // 2. Validar que las contraseñas coincidan
-      if (password !== confirmPassword) {
-        Alert.alert('Error', 'Las contraseñas no coinciden. Por favor verifica.');
-        return;
-      }
-    }
-
     try {
-      if (isRegistering) {
-        await signUp(email.trim(), password, { full_name: fullName.trim() });
-        Alert.alert('Éxito', 'Registro completado. Ya puedes acceder.');
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (error) {
+        Alert.alert('Error de inicio de sesión', error.message);
       } else {
-        await signIn(email.trim(), password);
+        navigation.replace('Home');
       }
-      navigation.goBack();
-    } catch (error) {
-      Alert.alert('Error de Autenticación', error.message);
+    } catch (err) {
+      Alert.alert('Error', 'Ocurrió un problema inesperado al conectar.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>
-        {isRegistering ? 'Crear Cuenta' : 'Iniciar Sesión'}
-      </Text>
-      <Text style={styles.subtitle}>
-        {isRegistering
-          ? 'Únete a VECTUM para gestionar tus vehículos'
-          : 'Accede a tu cuenta de VECTUM'}
-      </Text>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.innerContainer}
+      >
+        <View style={styles.headerContainer}>
+          <View style={styles.logoCircle}>
+            <Ionicons name="construct-outline" size={48} color="#2563eb" />
+          </View>
+          <Text style={styles.appTitle}>Vectum</Text>
+          <Text style={styles.appSubtitle}>Gestión y Arriendo de Maquinarias</Text>
+        </View>
 
-      {/* Nombre Completo (Solo Registro) */}
-      {isRegistering && (
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre completo"
-          value={fullName}
-          onChangeText={setFullName}
-        />
-      )}
-
-      {/* Correo Electrónico */}
-      <TextInput
-        style={styles.input}
-        placeholder="Correo electrónico"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      {/* Contraseña Principal con Ojo */}
-      <View style={styles.passwordContainer}>
-        <TextInput
-          style={styles.passwordInput}
-          placeholder="Contraseña"
-          secureTextEntry={!showPassword}
-          value={password}
-          onChangeText={setPassword}
-        />
-        <TouchableOpacity
-          style={styles.eyeButton}
-          onPress={() => setShowPassword(!showPassword)}
-        >
-          <Ionicons
-            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-            size={22}
-            color="#64748B"
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Confirmar Contraseña con Ojo (Solo Registro) */}
-      {isRegistering && (
-        <View style={styles.passwordContainer}>
-          <TextInput
-            style={styles.passwordInput}
-            placeholder="Confirmar contraseña"
-            secureTextEntry={!showConfirmPassword}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-          />
-          <TouchableOpacity
-            style={styles.eyeButton}
-            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-          >
-            <Ionicons
-              name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-              size={22}
-              color="#64748B"
+        <View style={styles.formContainer}>
+          <Text style={styles.label}>Correo Electrónico</Text>
+          <View style={styles.inputContainer}>
+            <Ionicons name="mail-outline" size={20} color="#64748b" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="ejemplo@duocuc.cl"
+              placeholderTextColor="#94a3b8"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
             />
+          </View>
+
+          <Text style={styles.label}>Contraseña</Text>
+          <View style={styles.inputContainer}>
+            <Ionicons name="lock-closed-outline" size={20} color="#64748b" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="••••••••"
+              placeholderTextColor="#94a3b8"
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={setPassword}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <Ionicons
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color="#64748b"
+              />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+            )}
           </TouchableOpacity>
         </View>
-      )}
-
-      {/* Botón de Acción */}
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>
-            {isRegistering ? 'Registrarse' : 'Ingresar'}
-          </Text>
-        )}
-      </TouchableOpacity>
-
-      {/* Cambiar entre Login y Registro */}
-      <TouchableOpacity
-        onPress={() => {
-          setIsRegistering(!isRegistering);
-          setConfirmPassword('');
-        }}
-        style={styles.switchButton}
-      >
-        <Text style={styles.switchText}>
-          {isRegistering
-            ? '¿Ya tienes cuenta? Inicia Sesión'
-            : '¿No tienes cuenta? Regístrate'}
-        </Text>
-      </TouchableOpacity>
-    </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#ffffff',
   },
-  title: {
+  innerContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 36,
+  },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  appTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
+    color: '#0f172a',
   },
-  subtitle: {
+  appSubtitle: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 24,
+    color: '#64748b',
+    marginTop: 4,
   },
-  input: {
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    marginBottom: 16,
+  formContainer: {
+    width: '100%',
   },
-  passwordContainer: {
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 6,
+  },
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     marginBottom: 16,
   },
-  passwordInput: {
+  inputIcon: {
+    marginRight: 8,
+  },
+  input: {
     flex: 1,
-    padding: 14,
-  },
-  eyeButton: {
-    paddingHorizontal: 14,
-  },
-  button: {
-    backgroundColor: '#2563eb',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  switchButton: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  switchText: {
-    color: '#2563eb',
     fontSize: 14,
+    color: '#0f172a',
+  },
+  loginButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  loginButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
 });
