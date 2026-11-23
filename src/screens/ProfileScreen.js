@@ -9,75 +9,97 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../config/supabase';
 import { useAuth } from '../context/AuthContext';
 
-export default function ProfileScreen() {
-  const { user, profile, activeRole, toggleRole, signOut } = useAuth();
+export default function ProfileScreen({ navigation }) {
+  const { user, activeRole, toggleRole } = useAuth();
+  const isAdmin = activeRole === 'admin';
 
-  const isAdminUser = profile?.role === 'admin';
-
-  const handleSignOut = () => {
-    Alert.alert('Cerrar Sesión', '¿Estás seguro de que deseas salir?', [
+  const handleLogout = async () => {
+    Alert.alert('Cerrar Sesión', '¿Deseas salir de tu cuenta?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Salir', style: 'destructive', onPress: signOut },
+      {
+        text: 'Salir',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await supabase.auth.signOut();
+          if (error) {
+            Alert.alert('Error', error.message);
+          }
+        },
+      },
     ]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.avatarCircle}>
-          <Ionicons name="person-outline" size={40} color="#2563eb" />
+        <Text style={styles.headerTitle}>Mi Cuenta</Text>
+      </View>
+
+      {/* TARJETA DE PERFIL */}
+      <View style={styles.profileCard}>
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={32} color="#2563eb" />
         </View>
-        <Text style={styles.userName}>
-          {profile?.full_name || user?.email || 'Usuario'}
-        </Text>
-        <Text style={styles.userEmail}>{user?.email}</Text>
-        
-        <View style={styles.badgeContainer}>
-          <View style={[styles.badge, isAdminUser ? styles.adminBadge : styles.clientBadge]}>
-            <Text style={styles.badgeText}>
-              {isAdminUser ? 'Cuenta Administrador' : 'Cuenta Cliente'}
+        <View style={styles.profileInfo}>
+          <Text style={styles.emailText}>{user?.email || 'Usuario Vectum'}</Text>
+          <View style={styles.roleTag}>
+            <Text style={styles.roleTagText}>
+              {isAdmin ? 'Vista: Administrador de Flota' : 'Vista: Cliente / Explorador'}
             </Text>
           </View>
         </View>
       </View>
 
-      <View style={styles.content}>
-        {/* CONMUTADOR DE MODO (Solo visible para Administradores) */}
-        {isAdminUser && (
-          <View style={styles.switchCard}>
-            <View style={styles.switchTextContainer}>
-              <Ionicons
-                name={activeRole === 'admin' ? 'briefcase' : 'search'}
-                size={22}
-                color="#2563eb"
-                style={{ marginRight: 10 }}
-              />
-              <View>
-                <Text style={styles.switchTitle}>Modo Administrador</Text>
-                <Text style={styles.switchSubtitle}>
-                  {activeRole === 'admin'
-                    ? 'Gestionando y publicando equipos'
-                    : 'Explorando catálogo como cliente'}
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={activeRole === 'admin'}
-              onValueChange={toggleRole}
-              trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
-              thumbColor={activeRole === 'admin' ? '#2563eb' : '#f8fafc'}
+      {/* INTERRUPTOR ESTILO AIRBNB */}
+      <View style={styles.switchCard}>
+        <View style={styles.switchHeader}>
+          <View style={styles.switchIconBox}>
+            <Ionicons
+              name={isAdmin ? 'construct' : 'swap-horizontal'}
+              size={22}
+              color="#0f172a"
             />
           </View>
-        )}
-
-        {/* BOTÓN DE CERRAR SESIÓN */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-          <Ionicons name="log-out-outline" size={20} color="#ef4444" style={{ marginRight: 8 }} />
-          <Text style={styles.logoutText}>Cerrar Sesión</Text>
-        </TouchableOpacity>
+          <View style={styles.switchTextContainer}>
+            <Text style={styles.switchTitle}>Modo Administrador</Text>
+            <Text style={styles.switchDescription}>
+              Activa esta opción para publicar maquinaria, gestionar tu flota y subir fichas técnicas.
+            </Text>
+          </View>
+          <Switch
+            value={isAdmin}
+            onValueChange={toggleRole}
+            trackColor={{ false: '#cbd5e1', true: '#0f172a' }}
+            thumbColor="#ffffff"
+          />
+        </View>
       </View>
+
+      {/* ACCESO DIRECTO SI ES ADMIN */}
+      {isAdmin && (
+        <TouchableOpacity
+          style={styles.adminActionCard}
+          onPress={() => navigation.navigate('Publicar')}
+        >
+          <Ionicons name="add-circle-outline" size={24} color="#2563eb" />
+          <View style={styles.adminActionText}>
+            <Text style={styles.adminActionTitle}>Publicar nueva maquinaria</Text>
+            <Text style={styles.adminActionSub}>
+              Agregar equipo por categoría y adjuntar ficha
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+        </TouchableOpacity>
+      )}
+
+      {/* BOTÓN CERRAR SESIÓN */}
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+        <Text style={styles.logoutText}>Cerrar Sesión</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -86,77 +108,113 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    paddingHorizontal: 20,
   },
   header: {
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    paddingVertical: 30,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    paddingTop: 18,
+    paddingBottom: 14,
   },
-  avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#eff6ff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginRight: 14,
   },
-  userName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#0f172a',
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  badgeContainer: {
-    marginTop: 10,
-  },
-  badge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  adminBadge: {
-    backgroundColor: '#dbeafe',
-  },
-  clientBadge: {
-    backgroundColor: '#f1f5f9',
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1e40af',
-  },
-  content: {
-    padding: 20,
-  },
-  switchCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 20,
-  },
-  switchTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  profileInfo: {
     flex: 1,
   },
-  switchTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
+  emailText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#0f172a',
   },
-  switchSubtitle: {
+  roleTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  roleTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  switchCard: {
+    backgroundColor: '#ffffff',
+    padding: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+  },
+  switchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  switchIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  switchTextContainer: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  switchTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  switchDescription: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 3,
+    lineHeight: 17,
+  },
+  adminActionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+    marginBottom: 20,
+  },
+  adminActionText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  adminActionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  adminActionSub: {
     fontSize: 12,
     color: '#64748b',
     marginTop: 2,
@@ -166,14 +224,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fef2f2',
+    paddingVertical: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#fecaca',
-    borderRadius: 12,
-    paddingVertical: 14,
+    marginTop: 'auto',
+    marginBottom: 24,
   },
   logoutText: {
     color: '#ef4444',
     fontSize: 15,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    marginLeft: 8,
   },
 });

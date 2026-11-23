@@ -3,8 +3,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
-
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 
 import HomeScreen from './src/screens/HomeScreen';
@@ -15,20 +13,28 @@ import LoginScreen from './src/screens/LoginScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// Stack de la pestaña "Buscar"
-function HomeStack() {
+// Stack para el modo Cliente (Explorar)
+function ClientStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeScreen" component={HomeScreen} />
-      <Stack.Screen name="AddVehicle" component={AddVehicleScreen} />
     </Stack.Navigator>
   );
 }
 
-// Stack dinámico para "Cuenta": si no hay sesión abre Login, si hay abre Perfil
-function AccountStack() {
-  const { user } = useAuth() || {};
+// Stack para el modo Administrador (Mi Flota / Publicar)
+function AdminStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="AdminFleetScreen" component={HomeScreen} />
+      <Stack.Screen name="AddVehicleScreen" component={AddVehicleScreen} />
+    </Stack.Navigator>
+  );
+}
 
+// Stack de Cuenta (Login o Perfil)
+function AccountStack() {
+  const { user } = useAuth();
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (
@@ -40,53 +46,57 @@ function AccountStack() {
   );
 }
 
+function MainNavigator() {
+  const { user, activeRole } = useAuth();
+  const isAdminMode = user && activeRole === 'admin';
+
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: isAdminMode ? '#0f172a' : '#2563eb',
+        tabBarInactiveTintColor: '#94a3b8',
+        tabBarStyle: {
+          height: 62,
+          paddingBottom: 8,
+          paddingTop: 6,
+          borderTopColor: '#e2e8f0',
+          backgroundColor: '#ffffff',
+        },
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+          if (route.name === 'Explorar') {
+            iconName = focused ? 'search' : 'search-outline';
+          } else if (route.name === 'Mi Flota') {
+            iconName = focused ? 'construct' : 'construct-outline';
+          } else if (route.name === 'Publicar') {
+            iconName = focused ? 'add-circle' : 'add-circle-outline';
+          } else if (route.name === 'Cuenta') {
+            iconName = focused ? 'person-circle' : 'person-circle-outline';
+          }
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+      })}
+    >
+      {isAdminMode ? (
+        <>
+          <Tab.Screen name="Mi Flota" component={AdminStack} />
+          <Tab.Screen name="Publicar" component={AddVehicleScreen} />
+        </>
+      ) : (
+        <Tab.Screen name="Explorar" component={ClientStack} />
+      )}
+
+      <Tab.Screen name="Cuenta" component={AccountStack} />
+    </Tab.Navigator>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <NavigationContainer>
-        <Tab.Navigator
-          initialRouteName="Home"
-          screenOptions={({ route }) => ({
-            headerShown: false,
-            tabBarActiveTintColor: '#2563eb',
-            tabBarInactiveTintColor: '#64748b',
-            tabBarStyle: {
-              height: Platform.OS === 'android' ? 75 : 85,
-              paddingBottom: Platform.OS === 'android' ? 18 : 25,
-              paddingTop: 8,
-              backgroundColor: '#ffffff',
-              borderTopWidth: 1,
-              borderTopColor: '#e2e8f0',
-              elevation: 8,
-            },
-            tabBarLabelStyle: {
-              fontSize: 12,
-              fontWeight: '600',
-            },
-            tabBarIcon: ({ color }) => {
-              let iconName;
-
-              if (route.name === 'Home') {
-                iconName = 'search-outline';
-              } else if (route.name === 'Cuenta') {
-                iconName = 'person-outline';
-              }
-
-              return <Ionicons name={iconName} size={24} color={color} />;
-            },
-          })}
-        >
-          <Tab.Screen 
-            name="Home" 
-            component={HomeStack} 
-            options={{ tabBarLabel: 'Buscar' }} 
-          />
-          <Tab.Screen 
-            name="Cuenta" 
-            component={AccountStack} 
-            options={{ tabBarLabel: 'Cuenta' }} 
-          />
-        </Tab.Navigator>
+        <MainNavigator />
       </NavigationContainer>
     </AuthProvider>
   );

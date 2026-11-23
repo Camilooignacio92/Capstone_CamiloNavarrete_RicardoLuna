@@ -1,159 +1,228 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  TouchableOpacity,
   TextInput,
+  TouchableOpacity,
+  FlatList,
   SafeAreaView,
   ActivityIndicator,
+  Linking,
+  Alert,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../config/supabase';
 import { useAuth } from '../context/AuthContext';
+import RoleSwitchPill from '../components/RoleSwitchPill';
 
-const CATEGORIES = [
-  { id: 'all', name: 'Todas', icon: 'grid-outline' },
-  { id: 'Tolva', name: 'Tolva', icon: 'bus-outline' },
-  { id: 'Cama Baja', name: 'Cama Baja', icon: 'car-outline' },
-  { id: 'Aljibe', name: 'Aljibe', icon: 'water-outline' },
-  { id: 'Pluma', name: 'Pluma', icon: 'construct-outline' },
-  { id: 'Excavadora', name: 'Excavadora', icon: 'hardware-chip-outline' },
-];
+const CATEGORIES = ['Todas', 'Tolva', 'Cama Baja', 'Aljibe', 'Pluma', 'Excavadora'];
 
 export default function HomeScreen({ navigation }) {
-  const { activeRole } = useAuth(); // Importa el rol activo ('client' o 'admin')
+  const { user, activeRole } = useAuth();
+  const isAdminMode = user && activeRole === 'admin';
+
   const [machines, setMachines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Todas');
 
-  // Cargar máquinas desde Supabase
   const fetchMachines = async () => {
     try {
-      setLoading(true);
-      let query = supabase.from('machines').select('*');
+      const { data, error } = await supabase
+        .from('machines')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (selectedCategory !== 'all') {
-        query = query.eq('category', selectedCategory);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error al obtener maquinarias:', error.message);
-      } else {
-        setMachines(data || []);
-      }
+      if (error) throw error;
+      setMachines(data || []);
     } catch (err) {
-      console.error('Error de conexión:', err);
+      console.error('Error al cargar maquinarias:', err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchMachines();
-  }, [selectedCategory]);
+  // Recarga automáticamente la lista cada vez que entras o vuelves a esta pantalla
+  useFocusEffect(
+    useCallback(() => {
+      fetchMachines();
+    }, [])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchMachines();
   };
 
-  // Filtrar por término de búsqueda en tiempo real
-  const filteredMachines = machines.filter((item) =>
-    item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.plate?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleOpenDocument = async (url) => {
+    if (!url) return;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Aviso', 'No se pudo abrir el enlace del documento.');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Hubo un problema al abrir la ficha técnica.');
+    }
+  };
+
+  const handleDeleteMachine = (id, name) => {
+    Alert.alert(
+      'Eliminar Equipo',
+      `¿Estás seguro de eliminar "${name}" de tu flota?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase.from('machines').delete().eq('id', id);
+              if (error) throw error;
+              fetchMachines();
+            } catch (err) {
+              Alert.alert('Error', 'No se pudo eliminar el registro.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Filtrado por categoría y texto de búsqueda
+  const filteredMachines = machines.filter((item) => {
+    const matchesCategory =
+      selectedCategory === 'Todas' || item.category === selectedCategory;
+    const query = searchQuery.toLowerCase();
+    const matchesSearch =
+      (item.name && item.name.toLowerCase().includes(query)) ||
+      (item.plate && item.plate.toLowerCase().includes(query)) ||
+      (item.category && item.category.toLowerCase().includes(query));
+
+    return matchesCategory && matchesSearch;
+  });
 
   const renderMachineCard = ({ item }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={styles.iconCircle}>
-          <Ionicons name="construct" size={24} color="#2563eb" />
+        <View style={styles.categoryBadge}>
+          <Text style={styles.categoryBadgeText}>{item.category || 'Maquinaria'}</Text>
         </View>
-        <View style={styles.cardTitleContainer}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          <Text style={styles.cardCategory}>{item.category} • {item.plate || 'Sin Patente'}</Text>
-        </View>
-        <View style={[
-          styles.statusBadge,
-          item.status === 'Disponible' ? styles.statusAvailable : styles.statusBusy
-        ]}>
+        <View style={styles.statusBadge}>
+          <View style={styles.statusDot} />
           <Text style={styles.statusText}>{item.status || 'Disponible'}</Text>
         </View>
       </View>
 
+      <Text style={styles.machineName}>{item.name}</Text>
+
+      <View style={styles.detailsRow}>
+        <View style={styles.detailItem}>
+          <Ionicons name="speedometer-outline" size={16} color="#64748b" />
+          <Text style={styles.detailText}>Capacidad: {item.capacity || 'N/A'}</Text>
+        </View>
+
+        {item.plate ? (
+          <View style={styles.detailItem}>
+            <Ionicons name="card-outline" size={16} color="#64748b" />
+            <Text style={styles.detailText}>Patente: {item.plate}</Text>
+          </View>
+        ) : null}
+      </View>
+
       <View style={styles.cardFooter}>
-        <Text style={styles.capacityText}>Capacidad: {item.capacity || 'N/A'}</Text>
-        <TouchableOpacity style={styles.detailButton}>
-          <Text style={styles.detailButtonText}>Ver detalle</Text>
-          <Ionicons name="chevron-forward" size={16} color="#2563eb" />
-        </TouchableOpacity>
+        {item.document_url ? (
+          <TouchableOpacity
+            style={styles.docButton}
+            onPress={() => handleOpenDocument(item.document_url)}
+          >
+            <Ionicons name="document-text-outline" size={18} color="#2563eb" />
+            <Text style={styles.docButtonText}>Ver Ficha Técnica</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.noDocText}>Sin ficha adjunta</Text>
+        )}
+
+        {isAdminMode && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleDeleteMachine(item.id, item.name)}
+          >
+            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* BARRA SUPERIOR DE BÚSQUEDA */}
+      {/* ENCABEZADO DINÁMICO */}
       <View style={styles.header}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={20} color="#94a3b8" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="¿Qué maquinaria buscas?"
-            placeholderTextColor="#94a3b8"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery !== '' && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color="#94a3b8" />
-            </TouchableOpacity>
-          )}
+        <View>
+          <Text style={styles.brandTitle}>Vectum</Text>
+          <Text style={styles.subtitle}>
+            {isAdminMode ? 'Panel de Gestión de Flota' : 'Encuentra maquinaria disponible'}
+          </Text>
         </View>
+
+        {isAdminMode && (
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => navigation.navigate('AddVehicleScreen')}
+          >
+            <Ionicons name="add" size={20} color="#ffffff" />
+            <Text style={styles.addButtonText}>Nueva</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* SECTOR DE CATEGORÍAS */}
-      <View style={styles.categoriesSection}>
-        <Text style={styles.sectionTitle}>Categorías</Text>
+      {/* BARRA DE BÚSQUEDA */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search-outline" size={20} color="#64748b" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar por equipo, categoría o patente..."
+          placeholderTextColor="#94a3b8"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={18} color="#94a3b8" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* FILTRO DE CATEGORÍAS */}
+      <View style={styles.categoriesWrapper}>
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
           data={CATEGORIES}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item}
           contentContainerStyle={styles.categoriesList}
           renderItem={({ item }) => {
-            const isSelected = selectedCategory === item.id;
+            const active = selectedCategory === item;
             return (
               <TouchableOpacity
-                style={[
-                  styles.categoryCard,
-                  isSelected && styles.categoryCardSelected,
-                ]}
-                onPress={() => setSelectedCategory(item.id)}
+                style={[styles.categoryChip, active && styles.categoryChipActive]}
+                onPress={() => setSelectedCategory(item)}
               >
-                <View style={[
-                  styles.categoryIconBg,
-                  isSelected && styles.categoryIconBgSelected
-                ]}>
-                  <Ionicons
-                    name={item.icon}
-                    size={22}
-                    color={isSelected ? '#ffffff' : '#2563eb'}
-                  />
-                </View>
-                <Text style={[
-                  styles.categoryText,
-                  isSelected && styles.categoryTextSelected
-                ]}>
-                  {item.name}
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    active && styles.categoryChipTextActive,
+                  ]}
+                >
+                  {item}
                 </Text>
               </TouchableOpacity>
             );
@@ -161,47 +230,44 @@ export default function HomeScreen({ navigation }) {
         />
       </View>
 
-      {/* ENCABEZADO DE LISTADO CON BOTÓN NUEVA (SOLO MODO ADMIN) */}
-      <View style={styles.listHeader}>
-        <Text style={styles.sectionTitle}>
-          Maquinaria Disponible ({filteredMachines.length})
+      {/* CONTADOR DE RESULTADOS */}
+      <View style={styles.resultsBar}>
+        <Text style={styles.resultsText}>
+          Equipos disponibles ({filteredMachines.length})
         </Text>
-
-        {activeRole === 'admin' && (
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => navigation.navigate('AddVehicle')}
-          >
-            <Ionicons name="add" size={18} color="#ffffff" />
-            <Text style={styles.addButtonText}>Nueva</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
-      {/* LISTADO DE MAQUINARIAS */}
+      {/* LISTADO DE MAQUINARIA */}
       {loading ? (
-        <View style={styles.centerContainer}>
+        <View style={styles.centerBox}>
           <ActivityIndicator size="large" color="#2563eb" />
+          <Text style={styles.loadingText}>Cargando flota...</Text>
         </View>
       ) : (
         <FlatList
           data={filteredMachines}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
           renderItem={renderMachineCard}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           ListEmptyComponent={
-            <View style={styles.centerContainer}>
-              <Ionicons name="alert-circle-outline" size={48} color="#cbd5e1" />
-              <Text style={styles.emptyText}>
-                No se encontraron equipos registrados en esta vista.
+            <View style={styles.emptyBox}>
+              <Ionicons name="construct-outline" size={48} color="#cbd5e1" />
+              <Text style={styles.emptyTitle}>No hay maquinaria en esta vista</Text>
+              <Text style={styles.emptySubtitle}>
+                {isAdminMode
+                  ? 'Presiona "+ Nueva" para publicar tu primer equipo.'
+                  : 'Intenta con otra categoría o término de búsqueda.'}
               </Text>
             </View>
           }
         />
       )}
+
+      {/* BOTÓN FLOTANTE ESTILO AIRBNB */}
+      <RoleSwitchPill />
     </SafeAreaView>
   );
 }
@@ -212,189 +278,224 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-    backgroundColor: '#ffffff',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 46,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#0f172a',
-  },
-  categoriesSection: {
-    paddingVertical: 12,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    marginHorizontal: 20,
-    marginBottom: 10,
-  },
-  categoriesList: {
-    paddingHorizontal: 16,
-  },
-  categoryCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 80,
-    paddingVertical: 10,
-    marginHorizontal: 4,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  categoryCardSelected: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
-  },
-  categoryIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#eff6ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  categoryIconBgSelected: {
-    backgroundColor: '#2563eb',
-  },
-  categoryText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  categoryTextSelected: {
-    color: '#2563eb',
-    fontWeight: 'bold',
-  },
-  listHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 8,
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: '#ffffff',
+  },
+  brandTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 2,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16a34a',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   addButtonText: {
     color: '#ffffff',
+    fontWeight: '700',
     fontSize: 13,
-    fontWeight: 'bold',
-    marginLeft: 2,
+    marginLeft: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#0f172a',
+  },
+  categoriesWrapper: {
+    marginTop: 12,
+  },
+  categoriesList: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  categoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    marginRight: 8,
+  },
+  categoryChipActive: {
+    backgroundColor: '#0f172a',
+    borderColor: '#0f172a',
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  categoryChipTextActive: {
+    color: '#ffffff',
+  },
+  resultsBar: {
+    paddingHorizontal: 20,
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  resultsText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: 6,
+    paddingBottom: 95, // Espacio inferior para que el botón flotante no tape la última tarjeta
   },
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  categoryBadge: {
     backgroundColor: '#eff6ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  cardTitleContainer: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#0f172a',
-  },
-  cardCategory: {
+  categoryBadgeText: {
+    color: '#2563eb',
     fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
+    fontWeight: '700',
   },
   statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 12,
   },
-  statusAvailable: {
-    backgroundColor: '#dcfce7',
-  },
-  statusBusy: {
-    backgroundColor: '#fef3c7',
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#16a34a',
+    marginRight: 5,
   },
   statusText: {
-    fontSize: 11,
-    fontWeight: 'bold',
     color: '#15803d',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  machineName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginBottom: 12,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailText: {
+    fontSize: 13,
+    color: '#475569',
+    marginLeft: 5,
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
+    paddingTop: 10,
   },
-  capacityText: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  detailButton: {
+  docButton: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  detailButtonText: {
-    fontSize: 12,
+  docButtonText: {
     color: '#2563eb',
-    fontWeight: 'bold',
-    marginRight: 2,
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 6,
   },
-  centerContainer: {
-    padding: 40,
+  noDocText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
+  deleteButton: {
+    padding: 6,
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
+  },
+  centerBox: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#64748b',
+    fontSize: 14,
+  },
+  emptyBox: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 50,
   },
-  emptyText: {
-    fontSize: 14,
-    color: '#94a3b8',
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#334155',
+    marginTop: 12,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#64748b',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 4,
+    paddingHorizontal: 30,
   },
 });
