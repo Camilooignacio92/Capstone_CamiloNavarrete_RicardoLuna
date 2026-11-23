@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 import HomeScreen from './src/screens/HomeScreen';
 import AddVehicleScreen from './src/screens/AddVehicleScreen';
@@ -13,7 +14,6 @@ import LoginScreen from './src/screens/LoginScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// Stack para el modo Cliente (Explorar)
 function ClientStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -22,7 +22,6 @@ function ClientStack() {
   );
 }
 
-// Stack para el modo Administrador (Mi Flota / Publicar)
 function AdminStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -32,7 +31,6 @@ function AdminStack() {
   );
 }
 
-// Stack de Cuenta (Login o Perfil)
 function AccountStack() {
   const { user } = useAuth();
   return (
@@ -48,20 +46,21 @@ function AccountStack() {
 
 function MainNavigator() {
   const { user, activeRole } = useAuth();
+  const { theme } = useTheme();
   const isAdminMode = user && activeRole === 'admin';
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: isAdminMode ? '#0f172a' : '#2563eb',
+        tabBarActiveTintColor: theme?.dark ? '#60a5fa' : isAdminMode ? '#0f172a' : '#2563eb',
         tabBarInactiveTintColor: '#94a3b8',
         tabBarStyle: {
           height: 62,
           paddingBottom: 8,
           paddingTop: 6,
-          borderTopColor: '#e2e8f0',
-          backgroundColor: '#ffffff',
+          borderTopColor: theme?.border || '#e2e8f0',
+          backgroundColor: theme?.tabBar || '#ffffff',
         },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
@@ -94,10 +93,12 @@ function MainNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <MainNavigator />
-      </NavigationContainer>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <MainNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

@@ -16,12 +16,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../config/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import RoleSwitchPill from '../components/RoleSwitchPill';
 
 const CATEGORIES = ['Todas', 'Tolva', 'Cama Baja', 'Aljibe', 'Pluma', 'Excavadora'];
 
 export default function HomeScreen({ navigation }) {
   const { user, activeRole } = useAuth();
+  const { theme } = useTheme();
   const isAdminMode = user && activeRole === 'admin';
 
   const [machines, setMachines] = useState([]);
@@ -47,7 +49,6 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  // Recarga automáticamente la lista cada vez que entras o vuelves a esta pantalla
   useFocusEffect(
     useCallback(() => {
       fetchMachines();
@@ -96,7 +97,6 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
-  // Filtrado por categoría y texto de búsqueda
   const filteredMachines = machines.filter((item) => {
     const matchesCategory =
       selectedCategory === 'Todas' || item.category === selectedCategory;
@@ -110,10 +110,12 @@ export default function HomeScreen({ navigation }) {
   });
 
   const renderMachineCard = ({ item }) => (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
       <View style={styles.cardHeader}>
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryBadgeText}>{item.category || 'Maquinaria'}</Text>
+        <View style={[styles.categoryBadge, { backgroundColor: theme.badgeBg }]}>
+          <Text style={[styles.categoryBadgeText, { color: theme.primary }]}>
+            {item.category || 'Maquinaria'}
+          </Text>
         </View>
         <View style={styles.statusBadge}>
           <View style={styles.statusDot} />
@@ -121,33 +123,39 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
 
-      <Text style={styles.machineName}>{item.name}</Text>
+      <Text style={[styles.machineName, { color: theme.text }]}>{item.name}</Text>
 
       <View style={styles.detailsRow}>
         <View style={styles.detailItem}>
-          <Ionicons name="speedometer-outline" size={16} color="#64748b" />
-          <Text style={styles.detailText}>Capacidad: {item.capacity || 'N/A'}</Text>
+          <Ionicons name="speedometer-outline" size={16} color={theme.subtext} />
+          <Text style={[styles.detailText, { color: theme.subtext }]}>
+            Capacidad: {item.capacity || 'N/A'}
+          </Text>
         </View>
 
         {item.plate ? (
           <View style={styles.detailItem}>
-            <Ionicons name="card-outline" size={16} color="#64748b" />
-            <Text style={styles.detailText}>Patente: {item.plate}</Text>
+            <Ionicons name="card-outline" size={16} color={theme.subtext} />
+            <Text style={[styles.detailText, { color: theme.subtext }]}>
+              Patente: {item.plate}
+            </Text>
           </View>
         ) : null}
       </View>
 
-      <View style={styles.cardFooter}>
+      <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
         {item.document_url ? (
           <TouchableOpacity
             style={styles.docButton}
             onPress={() => handleOpenDocument(item.document_url)}
           >
-            <Ionicons name="document-text-outline" size={18} color="#2563eb" />
-            <Text style={styles.docButtonText}>Ver Ficha Técnica</Text>
+            <Ionicons name="document-text-outline" size={18} color={theme.primary} />
+            <Text style={[styles.docButtonText, { color: theme.primary }]}>
+              Ver Ficha Técnica
+            </Text>
           </TouchableOpacity>
         ) : (
-          <Text style={styles.noDocText}>Sin ficha adjunta</Text>
+          <Text style={[styles.noDocText, { color: theme.subtext }]}>Sin ficha adjunta</Text>
         )}
 
         {isAdminMode && (
@@ -163,19 +171,19 @@ export default function HomeScreen({ navigation }) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* ENCABEZADO DINÁMICO */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.card }]}>
         <View>
-          <Text style={styles.brandTitle}>Vectum</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.brandTitle, { color: theme.text }]}>Vectum</Text>
+          <Text style={[styles.subtitle, { color: theme.subtext }]}>
             {isAdminMode ? 'Panel de Gestión de Flota' : 'Encuentra maquinaria disponible'}
           </Text>
         </View>
 
         {isAdminMode && (
           <TouchableOpacity
-            style={styles.addButton}
+            style={[styles.addButton, { backgroundColor: theme.primary }]}
             onPress={() => navigation.navigate('AddVehicleScreen')}
           >
             <Ionicons name="add" size={20} color="#ffffff" />
@@ -185,18 +193,23 @@ export default function HomeScreen({ navigation }) {
       </View>
 
       {/* BARRA DE BÚSQUEDA */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={20} color="#64748b" />
+      <View
+        style={[
+          styles.searchContainer,
+          { backgroundColor: theme.card, borderColor: theme.border },
+        ]}
+      >
+        <Ionicons name="search-outline" size={20} color={theme.subtext} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: theme.text }]}
           placeholder="Buscar por equipo, categoría o patente..."
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor={theme.subtext}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={18} color="#94a3b8" />
+            <Ionicons name="close-circle" size={18} color={theme.subtext} />
           </TouchableOpacity>
         )}
       </View>
@@ -213,13 +226,21 @@ export default function HomeScreen({ navigation }) {
             const active = selectedCategory === item;
             return (
               <TouchableOpacity
-                style={[styles.categoryChip, active && styles.categoryChipActive]}
+                style={[
+                  styles.categoryChip,
+                  { backgroundColor: theme.chipBg, borderColor: theme.chipBorder },
+                  active && {
+                    backgroundColor: theme.chipActiveBg,
+                    borderColor: theme.chipActiveBg,
+                  },
+                ]}
                 onPress={() => setSelectedCategory(item)}
               >
                 <Text
                   style={[
                     styles.categoryChipText,
-                    active && styles.categoryChipTextActive,
+                    { color: theme.subtext },
+                    active && { color: theme.chipActiveText },
                   ]}
                 >
                   {item}
@@ -232,7 +253,7 @@ export default function HomeScreen({ navigation }) {
 
       {/* CONTADOR DE RESULTADOS */}
       <View style={styles.resultsBar}>
-        <Text style={styles.resultsText}>
+        <Text style={[styles.resultsText, { color: theme.subtext }]}>
           Equipos disponibles ({filteredMachines.length})
         </Text>
       </View>
@@ -240,8 +261,10 @@ export default function HomeScreen({ navigation }) {
       {/* LISTADO DE MAQUINARIA */}
       {loading ? (
         <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color="#2563eb" />
-          <Text style={styles.loadingText}>Cargando flota...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.subtext }]}>
+            Cargando flota...
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -254,9 +277,11 @@ export default function HomeScreen({ navigation }) {
           }
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <Ionicons name="construct-outline" size={48} color="#cbd5e1" />
-              <Text style={styles.emptyTitle}>No hay maquinaria en esta vista</Text>
-              <Text style={styles.emptySubtitle}>
+              <Ionicons name="construct-outline" size={48} color={theme.subtext} />
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                No hay maquinaria en esta vista
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: theme.subtext }]}>
                 {isAdminMode
                   ? 'Presiona "+ Nueva" para publicar tu primer equipo.'
                   : 'Intenta con otra categoría o término de búsqueda.'}
@@ -275,7 +300,6 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   header: {
     flexDirection: 'row',
@@ -284,22 +308,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
-    backgroundColor: '#ffffff',
   },
   brandTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#0f172a',
   },
   subtitle: {
     fontSize: 13,
-    color: '#64748b',
     marginTop: 2,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0f172a',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
@@ -313,20 +333,17 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
     marginHorizontal: 20,
     marginTop: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   searchInput: {
     flex: 1,
     marginLeft: 10,
     fontSize: 14,
-    color: '#0f172a',
   },
   categoriesWrapper: {
     marginTop: 12,
@@ -339,22 +356,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#cbd5e1',
     marginRight: 8,
-  },
-  categoryChipActive: {
-    backgroundColor: '#0f172a',
-    borderColor: '#0f172a',
   },
   categoryChipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
-  },
-  categoryChipTextActive: {
-    color: '#ffffff',
   },
   resultsBar: {
     paddingHorizontal: 20,
@@ -364,20 +371,17 @@ const styles = StyleSheet.create({
   resultsText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#475569',
   },
   listContent: {
     paddingHorizontal: 20,
     paddingTop: 6,
-    paddingBottom: 95, // Espacio inferior para que el botón flotante no tape la última tarjeta
+    paddingBottom: 95,
   },
   card: {
-    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -391,13 +395,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryBadge: {
-    backgroundColor: '#eff6ff',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
   },
   categoryBadgeText: {
-    color: '#2563eb',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -424,7 +426,6 @@ const styles = StyleSheet.create({
   machineName: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0f172a',
     marginBottom: 8,
   },
   detailsRow: {
@@ -439,7 +440,6 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 13,
-    color: '#475569',
     marginLeft: 5,
   },
   cardFooter: {
@@ -447,7 +447,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
     paddingTop: 10,
   },
   docButton: {
@@ -455,14 +454,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   docButtonText: {
-    color: '#2563eb',
     fontSize: 13,
     fontWeight: '600',
     marginLeft: 6,
   },
   noDocText: {
     fontSize: 12,
-    color: '#94a3b8',
     fontStyle: 'italic',
   },
   deleteButton: {
@@ -477,7 +474,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#64748b',
     fontSize: 14,
   },
   emptyBox: {
@@ -488,12 +484,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#334155',
     marginTop: 12,
   },
   emptySubtitle: {
     fontSize: 13,
-    color: '#64748b',
     textAlign: 'center',
     marginTop: 4,
     paddingHorizontal: 30,

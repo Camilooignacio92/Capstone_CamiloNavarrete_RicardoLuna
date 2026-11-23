@@ -11,9 +11,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../config/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function ProfileScreen({ navigation }) {
   const { user, activeRole, toggleRole } = useAuth();
+  const { isDarkMode, toggleTheme, theme } = useTheme();
   const isAdmin = activeRole === 'admin';
 
   const handleLogout = async () => {
@@ -33,46 +35,77 @@ export default function ProfileScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mi Cuenta</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Mi Cuenta</Text>
       </View>
 
       {/* TARJETA DE PERFIL */}
-      <View style={styles.profileCard}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={32} color="#2563eb" />
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={[styles.avatar, { backgroundColor: theme.badgeBg }]}>
+          <Ionicons name="person" size={32} color={theme.primary} />
         </View>
         <View style={styles.profileInfo}>
-          <Text style={styles.emailText}>{user?.email || 'Usuario Vectum'}</Text>
-          <View style={styles.roleTag}>
-            <Text style={styles.roleTagText}>
+          <Text style={[styles.emailText, { color: theme.text }]}>
+            {user?.email || 'Usuario Vectum'}
+          </Text>
+          <View style={[styles.roleTag, { backgroundColor: theme.iconBox }]}>
+            <Text style={[styles.roleTagText, { color: theme.subtext }]}>
               {isAdmin ? 'Vista: Administrador de Flota' : 'Vista: Cliente / Explorador'}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* INTERRUPTOR ESTILO AIRBNB */}
-      <View style={styles.switchCard}>
+      <Text style={[styles.sectionLabel, { color: theme.subtext }]}>CONFIGURACIONES</Text>
+
+      {/* INTERRUPTOR MODO ADMINISTRADOR (ESTILO AIRBNB) */}
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <View style={styles.switchHeader}>
-          <View style={styles.switchIconBox}>
+          <View style={[styles.switchIconBox, { backgroundColor: theme.iconBox }]}>
             <Ionicons
               name={isAdmin ? 'construct' : 'swap-horizontal'}
               size={22}
-              color="#0f172a"
+              color={theme.text}
             />
           </View>
           <View style={styles.switchTextContainer}>
-            <Text style={styles.switchTitle}>Modo Administrador</Text>
-            <Text style={styles.switchDescription}>
-              Activa esta opción para publicar maquinaria, gestionar tu flota y subir fichas técnicas.
+            <Text style={[styles.switchTitle, { color: theme.text }]}>Modo Administrador</Text>
+            <Text style={[styles.switchDescription, { color: theme.subtext }]}>
+              Gestiona tu flota, publica maquinaria y sube fichas técnicas.
             </Text>
           </View>
           <Switch
             value={isAdmin}
             onValueChange={toggleRole}
-            trackColor={{ false: '#cbd5e1', true: '#0f172a' }}
+            trackColor={{ false: '#cbd5e1', true: '#2563eb' }}
+            thumbColor="#ffffff"
+          />
+        </View>
+      </View>
+
+      {/* INTERRUPTOR MODO OSCURO / MODO CLARO */}
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={styles.switchHeader}>
+          <View style={[styles.switchIconBox, { backgroundColor: theme.iconBox }]}>
+            <Ionicons
+              name={isDarkMode ? 'moon' : 'sunny'}
+              size={22}
+              color={isDarkMode ? '#facc15' : '#f59e0b'}
+            />
+          </View>
+          <View style={styles.switchTextContainer}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>
+              {isDarkMode ? 'Modo Oscuro' : 'Modo Claro'}
+            </Text>
+            <Text style={[styles.switchDescription, { color: theme.subtext }]}>
+              Cambia la apariencia visual de toda la aplicación.
+            </Text>
+          </View>
+          <Switch
+            value={isDarkMode}
+            onValueChange={toggleTheme}
+            trackColor={{ false: '#cbd5e1', true: '#2563eb' }}
             thumbColor="#ffffff"
           />
         </View>
@@ -81,17 +114,19 @@ export default function ProfileScreen({ navigation }) {
       {/* ACCESO DIRECTO SI ES ADMIN */}
       {isAdmin && (
         <TouchableOpacity
-          style={styles.adminActionCard}
+          style={[styles.adminActionCard, { backgroundColor: theme.card, borderColor: theme.border }]}
           onPress={() => navigation.navigate('Publicar')}
         >
-          <Ionicons name="add-circle-outline" size={24} color="#2563eb" />
+          <Ionicons name="add-circle-outline" size={24} color={theme.primary} />
           <View style={styles.adminActionText}>
-            <Text style={styles.adminActionTitle}>Publicar nueva maquinaria</Text>
-            <Text style={styles.adminActionSub}>
+            <Text style={[styles.adminActionTitle, { color: theme.text }]}>
+              Publicar nueva maquinaria
+            </Text>
+            <Text style={[styles.adminActionSub, { color: theme.subtext }]}>
               Agregar equipo por categoría y adjuntar ficha
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+          <Ionicons name="chevron-forward" size={20} color={theme.subtext} />
         </TouchableOpacity>
       )}
 
@@ -107,7 +142,6 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
     paddingHorizontal: 20,
   },
   header: {
@@ -117,23 +151,26 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#0f172a',
   },
-  profileCard: {
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 18,
+    padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   avatar: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#eff6ff',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -144,11 +181,9 @@ const styles = StyleSheet.create({
   emailText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
   },
   roleTag: {
     alignSelf: 'flex-start',
-    backgroundColor: '#f1f5f9',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -157,25 +192,16 @@ const styles = StyleSheet.create({
   roleTagText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#475569',
-  },
-  switchCard: {
-    backgroundColor: '#ffffff',
-    padding: 18,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 16,
   },
   switchHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   switchIconBox: {
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -187,22 +213,19 @@ const styles = StyleSheet.create({
   switchTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
   },
   switchDescription: {
     fontSize: 12,
-    color: '#64748b',
     marginTop: 3,
     lineHeight: 17,
   },
   adminActionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
     padding: 16,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#dbeafe',
+    marginTop: 4,
     marginBottom: 20,
   },
   adminActionText: {
@@ -212,11 +235,9 @@ const styles = StyleSheet.create({
   adminActionTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0f172a',
   },
   adminActionSub: {
     fontSize: 12,
-    color: '#64748b',
     marginTop: 2,
   },
   logoutButton: {
