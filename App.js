@@ -31,23 +31,10 @@ function AdminStack() {
   );
 }
 
-function AccountStack() {
-  const { user } = useAuth();
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {user ? (
-        <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
-      ) : (
-        <Stack.Screen name="LoginScreen" component={LoginScreen} />
-      )}
-    </Stack.Navigator>
-  );
-}
-
-function MainNavigator() {
-  const { user, activeRole } = useAuth();
+function AuthenticatedTabs() {
+  const { activeRole } = useAuth();
   const { theme } = useTheme();
-  const isAdminMode = user && activeRole === 'admin';
+  const isAdminMode = activeRole === 'admin';
 
   return (
     <Tab.Navigator
@@ -86,8 +73,22 @@ function MainNavigator() {
         <Tab.Screen name="Explorar" component={ClientStack} />
       )}
 
-      <Tab.Screen name="Cuenta" component={AccountStack} />
+      <Tab.Screen name="Cuenta" component={ProfileScreen} />
     </Tab.Navigator>
+  );
+}
+
+function RootNavigator() {
+  const { user } = useAuth();
+
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {user ? (
+        <Stack.Screen name="MainApp" component={AuthenticatedTabs} />
+      ) : (
+        <Stack.Screen name="LoginScreen" component={LoginScreen} />
+      )}
+    </Stack.Navigator>
   );
 }
 
@@ -96,7 +97,7 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <NavigationContainer>
-          <MainNavigator />
+          <RootNavigator />
         </NavigationContainer>
       </AuthProvider>
     </ThemeProvider>
